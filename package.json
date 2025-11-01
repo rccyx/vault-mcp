@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "description": "MCP Server for HashiCorp Vault secret management",
   "license": "MIT",
-  "author": "@ashgw",
-  "homepage": "https://ashgw/vault-mcp",
-  "bugs": "https://github.co/ashgw/vault-mcp/issues",
+  "author": "@rccyx",
+  "homepage": "https://rccyx/vault-mcp",
+  "bugs": "https://github.co/rccyx/vault-mcp/issues",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
@@ -20,7 +20,7 @@
     "lint": "biome check .."
   },
   "dependencies": {
-    "@ashgw/ts-env": "^1.5.3",
+    "envyx": "^1.2.0",
     "@modelcontextprotocol/sdk": "^1.9.0",
     "node-vault": "^0.10.2"
   },

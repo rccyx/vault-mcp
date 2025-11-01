@@ -39,7 +39,7 @@ Add this to your Cursor MCP configuration:
 }
 ```
 
-> If you prefer pinning to a specific docker image build (e.g. 20250413-165732), use that tag instead of latest. Browse available versions on [Docker Hub](https://hub.docker.com/r/ashgw/vault-mcp/tags).
+> If you prefer pinning to a specific docker image build (e.g. 20250413-165732), use that tag instead of latest. Browse available versions on [Dockerhub](https://hub.docker.com/r/ashgw/vault-mcp/tags).
 
 Once added, you can use prompts like:
 
@@ -66,7 +66,7 @@ docker run -d \
   ashgw/vault-mcp
 ```
 
-This uses the pre-built image published at [ashgw/vault-mcp](https://hub.docker.com/repository/docker/ashgw/vault-mcp).
+This uses the pre-built image published at [Dockerhub](https://hub.docker.com/repository/docker/ashgw/vault-mcp).
 
 ---
 
