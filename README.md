@@ -127,8 +127,8 @@ await tool("create_secret", {
   path: "apps/myapp/config",
   data: {
     apiKey: "secret-key-123",
-    environment: "production"
-  }
+    environment: "production",
+  },
 });
 ```
 
@@ -213,7 +213,7 @@ Prompts assist with higher-level authoring tasks by turning structured input int
 ```ts
 const draft = await prompt("generate_policy", {
   path: "secret/data/apps/*",
-  capabilities: "read,list"
+  capabilities: "read,list",
 });
 ```
 
