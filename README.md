@@ -42,7 +42,7 @@ The server wraps the HashiCorp Vault KV v2 API and common policy workflows insid
 ## How the Server Works
 
 1. You launch the server either locally or inside a container with a Vault token.
-2. An MCP client (Cursor, Claude Desktop, custom agents) connects over stdio or HTTP, depending on how you run it.
+2. An MCP client (Cursor, Claude Desktop, custom agents) connects over stdio.
 3. The client calls tools like `create_secret` or `create_policy`; the server validates the payload, forwards it to Vault, and returns structured responses.
 4. Resource requests such as `vault://secrets` list data-driven content that the client can browse or feed into follow-up prompts.
 5. Prompt handlers like `generate_policy` help you synthesize Vault-ready HCL from natural-language intents.
@@ -53,14 +53,14 @@ The implementation is written in TypeScript, bundles to a single JavaScript file
 
 - HashiCorp Vault 1.9+ with the KV secrets engine (v2) enabled on the paths you plan to manage.
 - A Vault token that starts with `hvs.` and grants the capabilities you need (read, create, update, delete and/or sudo for policy work).
-- Docker 24+, or a local runtime with Bun 1.1+ (or Node.js 18+) if you prefer running from source.
+- Docker 24+.
 - Network access from the machine running the MCP server to your Vault cluster.
 
 ## Getting Started
 
 ### Cursor
 
-Your'e most likely going to use this in cursor, just paste this snippet under `~/.cursor/mcp.json`
+You're most likely going to use this in Cursor. Paste this under `~/.cursor/mcp.json`:
 
 ```json
 {
@@ -87,15 +87,11 @@ Cursor starts the container on-demand, wires stdio to the MCP transport, and tea
 ### Run with Docker directly
 
 ```bash
-docker run \
-  --rm \
+docker run -i --rm \
   -e VAULT_ADDR=https://your-vault-server:8200 \
   -e VAULT_TOKEN=hvs.your-vault-token \
-  -p 3000:3000 \
   ashgw/vault-mcp:latest
 ```
-
-Expose a port only if you intend to connect via HTTP. For stdio clients (Cursor, Claude Desktop) you can omit `-p` entirely.
 
 ### Build and run locally from this repo (no upstream image)
 
@@ -107,20 +103,20 @@ cd vault-mcp
 docker build -t vault-mcp:local .
 
 # Run using your local image
-docker run \
-  --rm \
+docker run -i --rm \
   -e VAULT_ADDR=https://your-vault-server:8200 \
   -e VAULT_TOKEN=hvs.your-vault-token \
   vault-mcp:local
 ```
 
-To expose an HTTP port (if you purposefully run in HTTP mode), add `-p 3000:3000`.
+If you see "Unable to find image 'vault-mcp:local'", you skipped the build step above.
+
+To use your local image in Cursor, change the last arg from `ashgw/vault-mcp:latest` to `vault-mcp:local` in your `~/.cursor/mcp.json` and keep the same env vars.
 
 ## Configuration
 
 - `VAULT_ADDR` (required): URL of the Vault cluster, for example `https://vault.internal:8200` or `http://127.0.0.1:8200`.
 - `VAULT_TOKEN` (required): Short-lived or renewable Vault token starting with `hvs.`. Scope it tightly using Vault policies.
-- `MCP_PORT` (optional): Overrides the HTTP listener port when serving over TCP. Defaults to `3000` when not running in stdio mode.
 - `NODE_TLS_REJECT_UNAUTHORIZED` (optional): Set to `0` only for testing with self-signed certificates. Prefer adding proper CA bundles instead.
 
 Provide any additional Vault environment variables (such as `VAULT_NAMESPACE`) if your deployment requires them; the server forwards the process environment to the Vault client library.

@@ -34,11 +34,11 @@ jobs:
 
   build:
     needs: [container]
-    uses: ./.github/workflows/container.yml
+    uses: ./.github/workflows/build.yml
     secrets: inherit
 
   deploy:
     if: github.ref == 'refs/heads/main'
     needs: [container]
-    uses: ./.github/workflows/container.yml
+    uses: ./.github/workflows/deploy.yml
     secrets: inherit
