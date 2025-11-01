@@ -1,6 +1,6 @@
 {
   "name": "vault-mcp",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "MCP Server for HashiCorp Vault secret management",
   "license": "MIT",
   "author": "@rccyx",
