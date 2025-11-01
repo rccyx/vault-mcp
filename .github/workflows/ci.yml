@@ -16,16 +16,17 @@ concurrency:
 
 jobs:
   format:
-    uses: ./.github/workflows/check-formatting.yml
+    uses: ./.github/workflows/format.yml
   typecheck:
     uses: ./.github/workflows/typecheck.yml
   lint:
     uses: ./.github/workflows/lint.yml
-  test:
-    uses: ./.github/workflows/test.yml
 
-  npm:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  docker:
     if: github.ref == 'refs/heads/main'
-    needs: [format, typecheck, lint, test]
-    uses: ./.github/workflows/publish.yml
+    needs: [format, typecheck, lint, build]
+    uses: ./.github/workflows/container.yml
     secrets: inherit

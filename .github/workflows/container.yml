@@ -1,39 +1,23 @@
-name: Deployment
+name: Container
 
 on:
-  push:
-    branches:
-      - main
-
   pull_request:
-    branches:
-      - main
-
-    types:
-      - opened
-      - synchronize
-
-permissions:
-  contents: write
+  workflow_dispatch:
+  workflow_call:
 
 env:
   DOCKERHUB_USERNAME: ashgw
-
 jobs:
-  docker-push:
-    if: github.event_name == 'push'
-    needs: [fmt, lint]
-    environment: Docker Hub Deployment
-    timeout-minutes: 10
+  deploy:
     runs-on: ubuntu-latest
+    environment: production
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v3
-
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
       - name: Set DATE_TAG
         run: echo "DATE_TAG=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_ENV
-
       - name: Build & tag image
+        shell: bash
         run: |
           docker build -t ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ env.DATE_TAG }} .
           docker tag ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ env.DATE_TAG }} ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:latest
