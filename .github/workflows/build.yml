@@ -1,9 +1,13 @@
 name: Build
 
 on:
+  workflow_call:
+    outputs:
+      VERSION:
+        description: package.json version
+        value: ${{ jobs.build.outputs.VERSION }}
   pull_request:
   workflow_dispatch:
-  workflow_call:
 
 env:
   DOCKERHUB_USERNAME: ashgw
@@ -17,20 +21,19 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup
 
-      - name: Get version from package.json
+      - name: read version
         id: version
         run: |
-          VERSION=$(grep -o '"version": "[^"]*"' package.json | cut -d'"' -f4)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$(jq -r '.version' package.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Build & tag image
+      - name: docker build
         run: |
-          docker build -t ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ env.VERSION }} .
-          docker tag ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ env.VERSION }} ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:latest
+          docker build -t ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ steps.version.outputs.VERSION }} .
+          docker tag ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ steps.version.outputs.VERSION }} ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:latest
 
-      - name: Save Docker image as artifact
-        run: docker save ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ env.VERSION }} -o image.tar
+      - name: save image artifact
+        run: docker save ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ steps.version.outputs.VERSION }} -o image.tar
+
       - uses: actions/upload-artifact@v4
         with:
           name: vault-mcp-image

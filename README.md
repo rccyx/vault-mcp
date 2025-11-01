@@ -131,7 +131,7 @@ docker run -i --rm \
 
 Provide any additional Vault environment variables (such as `VAULT_NAMESPACE`) if your deployment requires them; the server forwards the process environment to the Vault client library.
 
-> For sane testing defaults locally use the `.env.example.copy` file.
+> For sane testing defaults locally use the `.env.copy.example` file.
 
 ## Tool Reference
 

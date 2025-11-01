@@ -1,9 +1,16 @@
 name: Deploy
 
 on:
-  pull_request:
-  workflow_dispatch:
   workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+
+# serialize only production deploys
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: true
 
 env:
   DOCKERHUB_USERNAME: ashgw
@@ -15,20 +22,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Download Docker image artifact
+      - name: download image artifact
         uses: actions/download-artifact@v4
         with:
           name: vault-mcp-image
           path: .
 
-      - name: Load Docker image
+      - name: load docker image
         run: docker load -i image.tar
 
-      - name: Login to DockerHub
+      - name: docker login
         run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u ${{ env.DOCKERHUB_USERNAME }} --password-stdin
 
-      - name: Push version-tagged image
-        run: docker push ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ needs.container-build.outputs.VERSION }}
+      - name: push version tag
+        run: docker push ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ inputs.version }}
 
-      - name: Push latest tag
-        run: docker push ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:latest
+      - name: tag and push latest
+        run: |
+          docker tag ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ inputs.version }} ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:latest
+          docker push ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:latest
