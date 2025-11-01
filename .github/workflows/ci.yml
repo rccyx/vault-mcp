@@ -22,11 +22,23 @@ jobs:
   lint:
     uses: ./.github/workflows/lint.yml
 
+  container:
+    needs: [lint, typecheck, format]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check if all jobs succeeded
+        uses: re-actors/alls-green@release/v1
+        id: all-green
+        with:
+          jobs: ${{ toJSON(needs) }}
+
   build:
-    uses: ./.github/workflows/build.yml
+    needs: [container]
+    uses: ./.github/workflows/container.yml
+    secrets: inherit
 
   deploy:
     if: github.ref == 'refs/heads/main'
-    needs: [format, typecheck, lint, build]
+    needs: [container]
     uses: ./.github/workflows/container.yml
     secrets: inherit

@@ -1,0 +1,35 @@
+name: Container
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+env:
+  DOCKERHUB_USERNAME: ashgw
+
+jobs:
+  deploy:
+    needs: container-build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vault-mcp-image
+          path: .
+
+      - name: Load Docker image
+        run: docker load -i image.tar
+
+      - name: Login to DockerHub
+        run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u ${{ env.DOCKERHUB_USERNAME }} --password-stdin
+
+      - name: Push version-tagged image
+        run: docker push ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ needs.container-build.outputs.VERSION }}
+
+      - name: Push latest tag
+        run: docker push ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:latest
