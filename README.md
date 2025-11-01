@@ -12,8 +12,8 @@ HashiCorp Vault MCP Server is a full-featured Model Context Protocol (MCP) integ
   - [Requirements](#requirements)
   - [Getting Started](#getting-started)
     - [Cursor](#cursor)
-    - [Run with Docker directly](#run-with-docker-directly)
-    - [Build and run locally from this repo (no upstream image)](#build-and-run-locally-from-this-repo-no-upstream-image)
+    - [Local Cursor](#local-cursor)
+      - [Local Docker](#local-docker)
   - [Configuration](#configuration)
   - [Tool Reference](#tool-reference)
     - [`create_secret`](#create_secret)
@@ -60,12 +60,12 @@ The implementation is written in TypeScript, bundles to a single JavaScript file
 
 ### Cursor
 
-You're most likely going to use this in Cursor. Paste this under `~/.cursor/mcp.json`:
+Production (recommended) — use the official image. Paste this under `~/.cursor/mcp.json`:
 
 ```json
 {
   "mcpServers": {
-    "HashiCorp Vault": {
+    "Vault": {
       "command": "docker",
       "args": [
         "run",
@@ -82,36 +82,46 @@ You're most likely going to use this in Cursor. Paste this under `~/.cursor/mcp.
 }
 ```
 
-Cursor starts the container on-demand, wires stdio to the MCP transport, and tears it down once the session ends. Pin a specific image tag (for example `ashgw/vault-mcp:1.2.0`) if you need deterministic environments.
+Cursor starts the container on-demand, wires stdio to the MCP transport, and tears it down once the session ends. Pin a tag (e.g. `ashgw/vault-mcp:1.x.y`) if you want a fixed version.
 
-### Run with Docker directly
+### Local Cursor
 
-```bash
-docker run -i --rm \
-  -e VAULT_ADDR=https://your-vault-server:8200 \
-  -e VAULT_TOKEN=hvs.your-vault-token \
-  ashgw/vault-mcp:latest
+You can build & run locally & use it like this
+
+```json
+{
+  "mcpServers": {
+    "Vault": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--network=host",
+        "-e",
+        "VAULT_ADDR=http://127.0.0.1:8200",
+        "-e",
+        "VAULT_TOKEN=hvs.test-token-1234567890abcdef",
+        "vault-mcp:local"
+      ]
+    }
+  }
+}
 ```
 
-### Build and run locally from this repo (no upstream image)
-
-If you want to test changes or avoid the published image, build your own:
+#### Local Docker
 
 ```bash
 git clone https://github.com/rccyx/vault-mcp.git
 cd vault-mcp
 docker build -t vault-mcp:local .
 
-# Run using your local image
 docker run -i --rm \
-  -e VAULT_ADDR=https://your-vault-server:8200 \
-  -e VAULT_TOKEN=hvs.your-vault-token \
+  --network=host \
+  -e VAULT_ADDR=http://127.0.0.1:8200 \
+  -e VAULT_TOKEN=hvs.test-token-1234567890abcdef \
   vault-mcp:local
 ```
-
-If you see "Unable to find image 'vault-mcp:local'", you skipped the build step above.
-
-To use your local image in Cursor, change the last arg from `ashgw/vault-mcp:latest` to `vault-mcp:local` in your `~/.cursor/mcp.json` and keep the same env vars.
 
 ## Configuration
 
@@ -120,6 +130,8 @@ To use your local image in Cursor, change the last arg from `ashgw/vault-mcp:lat
 - `NODE_TLS_REJECT_UNAUTHORIZED` (optional): Set to `0` only for testing with self-signed certificates. Prefer adding proper CA bundles instead.
 
 Provide any additional Vault environment variables (such as `VAULT_NAMESPACE`) if your deployment requires them; the server forwards the process environment to the Vault client library.
+
+> For sane testing defaults locally use the `.env.example.copy` file.
 
 ## Tool Reference
 
