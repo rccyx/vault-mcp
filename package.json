@@ -17,7 +17,7 @@
   "scripts": {
     "build": "bun build src/index.ts --outfile dist/index.js --target=node",
     "format": "prettier --write .",
-    "lint": "biome lint .",
+    "lint": "biome lint src",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

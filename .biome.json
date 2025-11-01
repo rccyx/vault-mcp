@@ -16,6 +16,6 @@
     }
   },
   "files": {
-    "ignore": ["dist/**"]
+    "ignore": ["dist", "node_modules"]
   }
 }
