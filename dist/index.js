@@ -10810,9 +10810,8 @@ class HttpVaultClient {
       const relative = path.substring("secret/data/".length);
       const meta = await this.request("GET", `secret/metadata/${relative}`);
       const currentVersion = meta.data.current_version;
-      if (!currentVersion) {
-        return this.request("DELETE", `secret/metadata/${relative}`);
-      }
+      if (!currentVersion)
+        throw new Error("No current_version found for secret");
       return this.request("POST", `secret/delete/${relative}`, {
         versions: [currentVersion]
       });
@@ -10848,7 +10847,10 @@ class VaultMcpServer {
     this.registerPrompts();
   }
   registerTools() {
-    this.server.tool("create_secret", "Create or update a secret at secret/data/{path} in Vault KV v2.", { path: z.string(), data: z.record(z.unknown()) }, async (args) => {
+    this.server.tool("create_secret", "Create or update a secret at secret/data/{path} in Vault KV v2.", {
+      path: z.string().min(1).describe("Relative KV v2 path under the 'secret' mount, e.g., 'app/config'."),
+      data: z.record(z.unknown()).describe("Arbitrary key/value object to store under the secret.")
+    }, async (args) => {
       const { path, data } = args;
       const result = await this.vaultClient.write(`secret/data/${path}`, {
         data
@@ -10863,49 +10865,97 @@ ${JSON.stringify(result, null, 2)}`
         ]
       };
     });
-    this.server.tool("read_secret", "Read a secret at secret/data/{path} from Vault KV v2.", { path: z.string() }, async (args) => {
+    this.server.tool("read_secret", "Read a secret at secret/data/{path} from Vault KV v2.", {
+      path: z.string().min(1).describe("Relative KV v2 path under the 'secret' mount, e.g., 'app/config'.")
+    }, async (args) => {
       const { path } = args;
-      const result = await this.vaultClient.readKv2(`secret/data/${path}`);
-      const payload = result.data?.data ?? {};
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Secret read at: ${path}
+      try {
+        const result = await this.vaultClient.readKv2(`secret/data/${path}`);
+        const payload = result.data?.data ?? {};
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Secret read at: ${path}
 ${JSON.stringify(payload, null, 2)}`
-          }
-        ]
-      };
+            }
+          ]
+        };
+      } catch (err) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to read secret at: ${path}
+${String(err)}`
+            }
+          ]
+        };
+      }
     });
-    this.server.tool("delete_secret", "Soft-delete the latest version of a secret at secret/data/{path} (KV v2).", { path: z.string() }, async (args) => {
+    this.server.tool("delete_secret", "Soft-delete the latest version of a secret at secret/data/{path} (KV v2).", {
+      path: z.string().min(1).describe("Relative KV v2 path under the 'secret' mount, e.g., 'app/config'.")
+    }, async (args) => {
       const { path } = args;
-      const result = await this.vaultClient.delete(`secret/data/${path}`);
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Secret deleted at: ${path}
+      try {
+        const result = await this.vaultClient.delete(`secret/data/${path}`);
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Secret deleted at: ${path}
 ${JSON.stringify(result, null, 2)}`
-          }
-        ]
-      };
+            }
+          ]
+        };
+      } catch (err) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to delete secret at: ${path}
+${String(err)}`
+            }
+          ]
+        };
+      }
     });
-    this.server.tool("create_policy", "Create or replace a Vault policy with the given name and HCL policy string.", { name: z.string(), policy: z.string() }, async (args) => {
+    this.server.tool("create_policy", "Create or replace a Vault policy with the given name and HCL policy string.", {
+      name: z.string().min(1).describe("Policy name (letters, digits, hyphens, underscores)."),
+      policy: z.string().min(1).describe("Policy contents in HCL or JSON syntax.")
+    }, async (args) => {
       const { name, policy } = args;
-      const result = await this.vaultClient.sys.addPolicy({ name, policy });
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Policy '${name}' created.
+      try {
+        const result = await this.vaultClient.sys.addPolicy({ name, policy });
+        return {
+          content: [
+            {
+              type: "text",
+              text: `Policy '${name}' created.
 ${JSON.stringify(result, null, 2)}`
-          }
-        ]
-      };
+            }
+          ]
+        };
+      } catch (err) {
+        return {
+          isError: true,
+          content: [
+            {
+              type: "text",
+              text: `Failed to create policy '${name}'
+${String(err)}`
+            }
+          ]
+        };
+      }
     });
   }
   registerResources() {
-    this.server.resource("vault_secrets", "vault://secrets", async () => {
+    this.server.resource("vault_secrets", "vault://secrets", {
+      description: "List of top-level KV v2 secret keys under 'secret' mount."
+    }, async () => {
       try {
         const result = await this.vaultClient.list("secret/metadata");
         return {
@@ -10927,7 +10977,9 @@ ${JSON.stringify(result, null, 2)}`
         };
       }
     });
-    this.server.resource("vault_policies", "vault://policies", async () => {
+    this.server.resource("vault_policies", "vault://policies", {
+      description: "All Vault ACL policy names returned by sys/policies/acl."
+    }, async () => {
       const result = await this.vaultClient.sys.listPolicies();
       return {
         contents: [
@@ -10940,9 +10992,9 @@ ${JSON.stringify(result, null, 2)}`
     });
   }
   registerPrompts() {
-    this.server.prompt("generate_policy", {
-      path: z.string(),
-      capabilities: z.string()
+    this.server.prompt("generate_policy", "Generate a minimal ACL policy block for a path and capabilities.", {
+      path: z.string().min(1).describe("Vault path pattern, e.g., 'secret/data/app/*'."),
+      capabilities: z.string().min(1).describe("Comma-separated capabilities, e.g., 'create,read,update,delete,list'.")
     }, async ({ path, capabilities }) => {
       const capArray = capabilities.split(",").map((c) => c.trim());
       const policy = { path: { [path]: { capabilities: capArray } } };
