@@ -1,0 +1,25 @@
+name: NPM
+
+on:
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+      - name: Build
+        run: pnpm build
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: bash ./scripts/publish.sh
