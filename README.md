@@ -32,6 +32,10 @@ HashiCorp Vault MCP Server is a full-featured Model Context Protocol (MCP) integ
 
 The server wraps the HashiCorp Vault KV v2 API and common policy workflows inside MCP primitives. Once a client connects, it can call typed tools, browse resources, and request prompt completions that are all backed by the same Vault instance you already operate. Every interaction is explicit: clients must supply the paths, data, and policies they want to work with, and the server relays those requests directly to Vault using a token you control.
 
+<img width="1222" height="909" alt="image" src="https://github.com/user-attachments/assets/4517458f-e882-4928-83ba-2ba3be2354a0" />
+
+
+
 ## Why Use This Server
 
 - Automate secret rotation and retrieval directly from MCP-compatible IDEs and agents.
