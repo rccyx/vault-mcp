@@ -20,28 +20,6 @@ env:
   DOCKERHUB_USERNAME: ashgw
 
 jobs:
-  fmt:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v1
-      - name: Install deps
-        run: bun install
-      - name: Run formatter
-        run: bun run format
-
-  lint:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v1
-      - name: Install deps
-        run: bun install
-      - name: Run linter
-        run: bun run lint
-
   docker-push:
     if: github.event_name == 'push'
     needs: [fmt, lint]
