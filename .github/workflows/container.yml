@@ -7,26 +7,53 @@ on:
 
 env:
   DOCKERHUB_USERNAME: ashgw
+
 jobs:
-  deploy:
+  container-build:
+    runs-on: ubuntu-latest
+    outputs:
+      DATE_TAG: ${{ steps.date_tag.outputs.DATE_TAG }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - name: Set DATE_TAG
+        id: date_tag
+        run: echo "DATE_TAG=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_ENV && echo "DATE_TAG=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+
+      - name: Build & tag image
+        run: |
+          docker build -t ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ env.DATE_TAG }} .
+          docker tag ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ env.DATE_TAG }} ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:latest
+
+      - name: Save Docker image as artifact
+        run: docker save ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ env.DATE_TAG }} -o image.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vault-mcp-image
+          path: image.tar
+
+  container-deploy:
+    needs: build
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/setup
-      - name: Set DATE_TAG
-        run: echo "DATE_TAG=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_ENV
-      - name: Build & tag image
-        shell: bash
-        run: |
-          docker build -t ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ env.DATE_TAG }} .
-          docker tag ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ env.DATE_TAG }} ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:latest
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vault-mcp-image
+          path: .
+
+      - name: Load Docker image
+        run: docker load -i image.tar
 
       - name: Login to DockerHub
         run: echo ${{ secrets.DOCKERHUB_TOKEN }} | docker login -u ${{ env.DOCKERHUB_USERNAME }} --password-stdin
 
       - name: Push date-tagged image
-        run: docker push ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ env.DATE_TAG }}
+        run: docker push ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:${{ needs.build.outputs.DATE_TAG }}
 
       - name: Push latest tag
         run: docker push ${{ env.DOCKERHUB_USERNAME }}/vault-mcp:latest

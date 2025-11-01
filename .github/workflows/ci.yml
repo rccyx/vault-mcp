@@ -25,7 +25,7 @@ jobs:
   build:
     uses: ./.github/workflows/build.yml
 
-  docker:
+  deploy:
     if: github.ref == 'refs/heads/main'
     needs: [format, typecheck, lint, build]
     uses: ./.github/workflows/container.yml

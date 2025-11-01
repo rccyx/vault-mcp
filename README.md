@@ -163,35 +163,191 @@ Check if it works, it should be green
 
 ---
 
-## Local Development
+## Run Everything Locally with Docker
 
-You have two ways to run locally: Docker (recommended, no local setup needed) or Bun (from source).
+**Prerequisites:** Just Docker installed. That's it.
 
-### Prerequisites
+This guide shows you how to run Vault, the MCP server, and test everything locally using only Docker and curl.
 
-- **Docker** OR **Bun** (install from https://bun.sh)
-- A Vault server with KV v2 enabled at `secret/` mount
-- Valid Vault token with read/write permissions
+### Step 1: Start Vault in Dev Mode
 
-### Start a Local Vault (Dev Mode)
-
-Quick way to get a test Vault running:
+Start a local Vault dev server (this gives you a test Vault that resets on restart):
 
 ```bash
-docker run --rm -it --cap-add=IPC_LOCK \
+docker run -d --name vault-dev \
+  --cap-add=IPC_LOCK \
+  -p 8200:8200 \
   -e VAULT_DEV_ROOT_TOKEN_ID=hvs.localroot \
-  -p 8200:8200 hashicorp/vault:1.16
+  hashicorp/vault:1.16
+```
 
+This runs Vault on `http://127.0.0.1:8200` with root token `hvs.localroot`.
+
+### Step 2: Enable KV v2 Secret Engine
+
+Vault dev mode doesn't enable KV v2 by default. Enable it via API:
+
+```bash
 export VAULT_ADDR=http://127.0.0.1:8200
 export VAULT_TOKEN=hvs.localroot
 
-# Enable KV v2 at secret/ if not already enabled
-vault secrets enable -path=secret -version=2 kv
+curl -sS -X POST \
+  -H "X-Vault-Token: $VAULT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"kv","options":{"version":"2"}}' \
+  "$VAULT_ADDR/v1/sys/mounts/secret"
 ```
 
----
+This enables KV v2 at the `secret/` mount point (required for all secret operations).
 
-### Docker (Local, Manual)
+### Step 3: Test Vault with curl
+
+Verify everything works before running the MCP server:
+
+**Write a secret:**
+
+```bash
+curl -sS -X POST \
+  -H "X-Vault-Token: $VAULT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"data":{"username":"demo","password":"s3cr3t"}}' \
+  "$VAULT_ADDR/v1/secret/data/app/config" | jq
+```
+
+Expected response shows the secret metadata:
+
+```json
+{
+  "request_id": "...",
+  "lease_id": "",
+  "renewable": false,
+  "lease_duration": 0,
+  "data": {
+    "created_time": "...",
+    "custom_metadata": null,
+    "deletion_time": "",
+    "destroyed": false,
+    "version": 1
+  }
+}
+```
+
+**Read the secret back:**
+
+```bash
+curl -sS \
+  -H "X-Vault-Token: $VAULT_TOKEN" \
+  "$VAULT_ADDR/v1/secret/data/app/config" | jq
+```
+
+Expected response:
+
+```json
+{
+  "request_id": "...",
+  "lease_id": "",
+  "renewable": false,
+  "lease_duration": 0,
+  "data": {
+    "data": {
+      "username": "demo",
+      "password": "s3cr3t"
+    },
+    "metadata": {
+      "created_time": "...",
+      "custom_metadata": null,
+      "deletion_time": "",
+      "destroyed": false,
+      "version": 1
+    }
+  }
+}
+```
+
+**List secret keys:**
+
+```bash
+curl -sS \
+  -H "X-Vault-Token: $VAULT_TOKEN" \
+  "$VAULT_ADDR/v1/secret/metadata?list=true" | jq
+```
+
+Expected response:
+
+```json
+{
+  "request_id": "...",
+  "lease_id": "",
+  "renewable": false,
+  "lease_duration": 0,
+  "data": {
+    "keys": ["app/"]
+  }
+}
+```
+
+**Create a policy:**
+
+```bash
+curl -sS -X PUT \
+  -H "X-Vault-Token: $VAULT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"policy":"path \"secret/data/app/*\" { capabilities=[\"read\",\"list\"] }"}' \
+  "$VAULT_ADDR/v1/sys/policies/acl/demo-policy" | jq
+```
+
+Expected response (empty, success):
+
+```json
+{}
+```
+
+**List policies:**
+
+```bash
+curl -sS \
+  -H "X-Vault-Token: $VAULT_TOKEN" \
+  "$VAULT_ADDR/v1/sys/policies/acl" | jq
+```
+
+Expected response:
+
+```json
+{
+  "request_id": "...",
+  "data": {
+    "keys": ["default", "demo-policy", "root"]
+  }
+}
+```
+
+**Delete a secret (soft-delete latest version):**
+
+First, get the current version:
+
+```bash
+curl -sS \
+  -H "X-Vault-Token: $VAULT_TOKEN" \
+  "$VAULT_ADDR/v1/secret/metadata/app/config" | jq '.data.current_version'
+```
+
+Then delete that version:
+
+```bash
+curl -sS -X POST \
+  -H "X-Vault-Token: $VAULT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"versions":[1]}' \
+  "$VAULT_ADDR/v1/secret/delete/app/config" | jq
+```
+
+Expected response (empty, success):
+
+```json
+{}
+```
+
+### Step 4: Run the MCP Server
 
 Using the official published image:
 
@@ -200,6 +356,7 @@ export VAULT_ADDR=http://127.0.0.1:8200
 export VAULT_TOKEN=hvs.localroot
 
 docker run -i --rm \
+  --network host \
   -e VAULT_ADDR=$VAULT_ADDR \
   -e VAULT_TOKEN=$VAULT_TOKEN \
   ashgw/vault-mcp:latest
@@ -209,90 +366,44 @@ Or build and run from source:
 
 ```bash
 docker build -t vault-mcp .
+
 docker run -i --rm \
+  --network host \
   -e VAULT_ADDR=$VAULT_ADDR \
   -e VAULT_TOKEN=$VAULT_TOKEN \
   vault-mcp
 ```
 
+> **Note:** The `--network host` flag lets the container access Vault on `127.0.0.1:8200`. If you're on Mac/Windows, use `host.docker.internal:8200` instead and update `VAULT_ADDR` accordingly.
+
 The server runs via stdio and waits for an MCP client connection (Cursor, etc.). Without a client connected, it will appear idle.
 
----
+### Step 5: Clean Up
 
-### Bun (Local, From Source)
-
-**Prerequisites:**
-
-- Install Bun: https://bun.sh
-
-**Steps:**
-
-1. Install dependencies:
+Stop and remove the Vault container:
 
 ```bash
-bun install
+docker stop vault-dev
+docker rm vault-dev
 ```
-
-2. Lint and typecheck:
-
-```bash
-bun run lint
-bun run typecheck
-```
-
-3. Build:
-
-```bash
-bun run build
-```
-
-4. Run the server:
-
-```bash
-export VAULT_ADDR=http://127.0.0.1:8200
-export VAULT_TOKEN=hvs.localroot
-
-node dist/index.js
-# or: bun dist/index.js
-```
-
-The server runs via stdio and waits for an MCP client connection. Connect using Cursor or another MCP client.
 
 ---
 
-### Testing Vault API Directly (Optional)
+## Using Your Own Vault Server
 
-These curl commands verify Vault is working correctly (not MCP). Useful for debugging:
-
-**Write KV v2 data:**
+If you already have a Vault server running, just point the MCP server at it:
 
 ```bash
-curl -sS -X POST -H "X-Vault-Token: $VAULT_TOKEN" -H "Content-Type: application/json" \
-  -d '{"data":{"username":"demo","password":"s3cr3t"}}' \
-  "$VAULT_ADDR/v1/secret/data/app/config"
+docker run -i --rm \
+  -e VAULT_ADDR=https://your-vault-server:8200 \
+  -e VAULT_TOKEN=hvs.your-token \
+  ashgw/vault-mcp:latest
 ```
 
-**Read KV v2 data:**
+Make sure:
 
-```bash
-curl -sS -H "X-Vault-Token: $VAULT_TOKEN" \
-  "$VAULT_ADDR/v1/secret/data/app/config" | jq
-```
-
-**List keys:**
-
-```bash
-curl -sS -H "X-Vault-Token: $VAULT_TOKEN" \
-  "$VAULT_ADDR/v1/secret/metadata?list=true" | jq
-```
-
-**Create/update ACL policy:**
-
-```bash
-curl -sS -X PUT -H "X-Vault-Token: $VAULT_TOKEN" -H "Content-Type: application/json" \
-  -d '{"policy":"path \"secret/data/app/*\" { capabilities=[\"read\",\"list\"] }"}' \
-  "$VAULT_ADDR/v1/sys/policies/acl/demo-policy"
-```
+- Your Vault has KV v2 enabled at `secret/` mount
+- Your token has permissions to access `secret/` and `sys/policies/acl`
 
 ---
 
@@ -309,8 +420,9 @@ These are required to run the MCP Vault server:
 ## Troubleshooting
 
 - **Tools don't appear in client**: Ensure you're launching via an MCP client (like Cursor). All tools have descriptions and should appear.
-- **KV mount not found**: Make sure KV v2 is enabled at `secret/` mount: `vault secrets enable -path=secret -version=2 kv`
+- **KV mount not found**: Make sure KV v2 is enabled at `secret/` mount. Use the curl command in Step 2 above.
 - **Token errors**: Token must start with `hvs.` and have permissions to access `secret/` mount and `sys/policies/acl`
+- **Connection refused**: On Mac/Windows Docker, use `host.docker.internal:8200` instead of `127.0.0.1:8200` for `VAULT_ADDR`
 - **TLS/SSL issues**: If using HTTPS with self-signed certificates, configure your environment accordingly
 
 ---
