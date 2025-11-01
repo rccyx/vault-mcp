@@ -4,19 +4,29 @@ HashiCorp Vault MCP Server is a full-featured Model Context Protocol (MCP) integ
 
 ## Table of Contents
 
-- [Introduction](#introduction)
-- [Why Use This Server](#why-use-this-server)
-- [How the Server Works](#how-the-server-works)
-- [Requirements](#requirements)
-- [Getting Started](#getting-started)
-- [Configuration](#configuration)
-- [Tool Reference](#tool-reference)
-- [Resource Reference](#resource-reference)
-- [Prompt Reference](#prompt-reference)
-- [Security Notes](#security-notes)
-- [Development Workflow](#development-workflow)
-- [Troubleshooting](#troubleshooting)
-- [License](#license)
+- [HashiCorp Vault MCP Server](#hashicorp-vault-mcp-server)
+  - [Table of Contents](#table-of-contents)
+  - [Introduction](#introduction)
+  - [Why Use This Server](#why-use-this-server)
+  - [How the Server Works](#how-the-server-works)
+  - [Requirements](#requirements)
+  - [Getting Started](#getting-started)
+    - [Cursor](#cursor)
+    - [Run with Docker directly](#run-with-docker-directly)
+    - [Build and run locally from this repo (no upstream image)](#build-and-run-locally-from-this-repo-no-upstream-image)
+  - [Configuration](#configuration)
+  - [Tool Reference](#tool-reference)
+    - [`create_secret`](#create_secret)
+    - [`read_secret`](#read_secret)
+    - [`delete_secret`](#delete_secret)
+    - [`create_policy`](#create_policy)
+  - [Resource Reference](#resource-reference)
+    - [`vault://secrets`](#vaultsecrets)
+    - [`vault://policies`](#vaultpolicies)
+  - [Prompt Reference](#prompt-reference)
+    - [`generate_policy`](#generate_policy)
+  - [Troubleshooting](#troubleshooting)
+  - [License](#license)
 
 ## Introduction
 
@@ -37,7 +47,7 @@ The server wraps the HashiCorp Vault KV v2 API and common policy workflows insid
 4. Resource requests such as `vault://secrets` list data-driven content that the client can browse or feed into follow-up prompts.
 5. Prompt handlers like `generate_policy` help you synthesize Vault-ready HCL from natural-language intents.
 
-The implementation is written in TypeScript, bundles to a single Node-compatible file, and relies on the official `@modelcontextprotocol/sdk` for transport and schema validation.
+The implementation is written in TypeScript, bundles to a single JavaScript file, and relies on the official `@modelcontextprotocol/sdk` for transport and schema validation.
 
 ## Requirements
 
@@ -48,9 +58,9 @@ The implementation is written in TypeScript, bundles to a single Node-compatible
 
 ## Getting Started
 
-### Add the server to Cursor (recommended)
+### Cursor
 
-Update your Cursor MCP configuration to point at the published container image:
+Your'e most likely going to use this in cursor, just paste this snippet under `~/.cursor/mcp.json`
 
 ```json
 {
@@ -87,19 +97,24 @@ docker run \
 
 Expose a port only if you intend to connect via HTTP. For stdio clients (Cursor, Claude Desktop) you can omit `-p` entirely.
 
-### Run from source
+### Build and run locally from this repo (no upstream image)
+
+If you want to test changes or avoid the published image, build your own:
 
 ```bash
-git clone https://github.com/ashgw/vault-mcp.git
+git clone https://github.com/rccyx/vault-mcp.git
 cd vault-mcp
-bun install
-VAULT_ADDR=https://your-vault-server:8200 \
-VAULT_TOKEN=hvs.your-vault-token \
-bun run build
-node dist/index.js
+docker build -t vault-mcp:local .
+
+# Run using your local image
+docker run \
+  --rm \
+  -e VAULT_ADDR=https://your-vault-server:8200 \
+  -e VAULT_TOKEN=hvs.your-vault-token \
+  vault-mcp:local
 ```
 
-Replace `node dist/index.js` with `bun run dist/index.js` if you prefer to stick with Bun for execution. The binary entry point is also available as `hashicorp-vault-mcp` once you add `dist` to your PATH.
+To expose an HTTP port (if you purposefully run in HTTP mode), add `-p 3000:3000`.
 
 ## Configuration
 
@@ -216,23 +231,6 @@ const draft = await prompt("generate_policy", {
   capabilities: "read,list",
 });
 ```
-
-## Security Notes
-
-- Treat the MCP server like any other application credential: store `VAULT_TOKEN` in a secure secret manager and rotate it regularly.
-- Limit the token's policy to the exact paths and capabilities that MCP clients require. The server does not escalate privileges beyond what the token already has.
-- Enable Vault audit logging so MCP-driven requests are captured alongside human usage.
-- If you expose the server over HTTP, place it behind TLS termination and restrict inbound IP ranges.
-
-## Development Workflow
-
-- `bun install`: Install dependencies (use `npm install` or `pnpm install` if you prefer another package manager).
-- `bun run build`: Compile TypeScript to `dist/index.js` using Bun.
-- `bun run lint`: Run Biome linting over `src`.
-- `bun run typecheck`: Validate TypeScript types without emitting output.
-- `docker build -t ashgw/vault-mcp:dev .`: Produce a local container image.
-
-The entry point lives in `src/index.ts`; it wires up the MCP server, defines tools, and handles Vault client interactions. Contributions welcome—open issues or pull requests if you add new tools or support additional Vault engines.
 
 ## Troubleshooting
 
